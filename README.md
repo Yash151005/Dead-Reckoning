@@ -11,8 +11,8 @@ Unlike existing tools that scrape or lookup data, Dead Reckoning **derives** spe
 ### 1. Clone & Install
 
 ```bash
-git clone <repo-url>
-cd dead-reckoning
+git clone https://github.com/Yash151005/Dead-Reckoning.git
+cd Dead-Reckoning
 pip install -r requirements.txt
 ```
 
@@ -86,6 +86,7 @@ dead-reckoning/
 ├── app.py              # Main Streamlit application
 ├── requirements.txt    # Python dependencies
 ├── .env.example        # Environment variable template
+├── .gitignore          # Git ignore file
 └── README.md           # This file
 ```
 
