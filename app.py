@@ -20,7 +20,9 @@ from datetime import datetime
 import pandas as pd
 from PIL import Image
 from groq import Groq
+import re
 from dotenv import load_dotenv
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 # ─── Load environment variables ─────────────────────────────────────────────
 
@@ -267,7 +269,7 @@ section[data-testid="stSidebar"] hr {
 /* ── Result Header — Bright Blue Gradient ───────── */
 .result-header {
     background: linear-gradient(135deg, #2563EB 0%, #3B82F6 50%, #7C3AED 100%);
-    color: white;
+    color: black;
     padding: 1.2rem 1.5rem;
     border-radius: 12px 12px 0 0;
     margin-bottom: 0;
@@ -277,13 +279,13 @@ section[data-testid="stSidebar"] hr {
     margin: 0;
     font-size: 1.3rem;
     font-weight: 700;
-    color: #FFFFFF;
+    color: #000000;
 }
 
 .result-header p {
     margin: 0.3rem 0 0 0;
     font-size: 0.85rem;
-    color: rgba(255,255,255,0.85);
+    color: rgba(0,0,0,0.85);
 }
 
 .result-body {
@@ -299,9 +301,6 @@ section[data-testid="stSidebar"] hr {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    border-radius: 8px;
-    overflow: hidden;
-    border: 1px solid #E2E8F0;
     font-size: 0.9rem;
 }
 
@@ -705,7 +704,7 @@ def validate_api_key(key: str) -> bool:
     try:
         client = Groq(api_key=key)
         client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": "ping"}],
             max_tokens=5,
         )
@@ -770,11 +769,13 @@ def build_spec_table_html(specs: list) -> str:
             "</tr>"
         )
     return (
+        '<div style="max-height: 400px; overflow-y: auto; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 1rem;">'
         '<table class="spec-table"><thead><tr>'
         "<th>Field</th><th>Value</th><th>Source Type</th>"
         "<th>Confidence</th><th>Reasoning</th>"
         "</tr></thead><tbody>"
         f"{rows}</tbody></table>"
+        "</div>"
     )
 
 
@@ -864,7 +865,7 @@ NAMEPLATE_SYSTEM_PROMPT = (
 
 # ─── API Call Wrappers ───────────────────────────────────────────────────────
 
-
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=2, max=20), reraise=True)
 def call_vision(client: Groq, image_b64: str, prompt: str | None = None) -> str:
     """Analyse an image via the vision model and return the raw response text."""
     user_content = [
@@ -878,34 +879,38 @@ def call_vision(client: Groq, image_b64: str, prompt: str | None = None) -> str:
         },
     ]
     response = client.chat.completions.create(
-        model="llama-3.2-11b-vision-preview",
+        model="qwen/qwen3.6-27b",
         messages=[
             {"role": "system", "content": NAMEPLATE_SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
-        max_tokens=2048,
+        max_tokens=4000,
         temperature=0.2,
     )
     return response.choices[0].message.content
 
-
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=2, max=20), reraise=True)
 def call_spec_inference(client: Groq, user_prompt: str) -> str:
     """Run the main spec inference and return raw response text."""
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[
             {"role": "system", "content": SPEC_SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ],
-        max_tokens=4096,
+        max_tokens=4000,
         temperature=0.3,
     )
     return response.choices[0].message.content
 
 
 def safe_parse_json(text: str) -> dict | None:
-    """Try to parse JSON from the model response, handling markdown fences."""
+    """Try to parse JSON from the model response, handling markdown fences and think blocks."""
     cleaned = text.strip()
+    
+    # Remove <think>...</think> blocks using regex
+    cleaned = re.sub(r'<think>.*?</think>', '', cleaned, flags=re.DOTALL).strip()
+    
     if cleaned.startswith("```"):
         lines = cleaned.split("\n")
         lines = lines[1:]  # remove opening fence
@@ -1323,9 +1328,11 @@ with tab_nameplate:
                         f"<td>{confidence_bar_html(conf)}</td></tr>"
                     )
                 st.markdown(
+                    '<div style="max-height: 400px; overflow-y: auto; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 1rem;">'
                     '<table class="spec-table"><thead><tr>'
                     "<th>Field</th><th>Value</th><th>Confidence</th>"
-                    f"</tr></thead><tbody>{rows_html}</tbody></table>",
+                    f"</tr></thead><tbody>{rows_html}</tbody></table>"
+                    "</div>",
                     unsafe_allow_html=True,
                 )
 

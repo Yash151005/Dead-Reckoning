@@ -72,8 +72,8 @@ No secrets configuration needed — users enter their own Groq API key in the si
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Streamlit |
-| LLM (text) | Groq — `llama-3.3-70b-versatile` |
-| LLM (vision) | Groq — `llama-3.2-11b-vision-preview` |
+| LLM (text) | Groq — `openai/gpt-oss-120b` |
+| LLM (vision) | Groq — `qwen/qwen3.6-27b` |
 | Image processing | Pillow |
 | Data handling | Pandas |
 
